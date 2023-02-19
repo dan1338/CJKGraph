@@ -8,7 +8,8 @@ let graph;
 
 window.onload = async function() {
 	raw_data = await get_raw_data();
-	graph = new NodeGraph(raw_data.map(x => new Node(x)));
+	let nodes = raw_data.map(x => new Node(x));
+	graph = new NodeGraph(nodes);
 
 	setup_canvas();
 }
@@ -31,7 +32,7 @@ function setup_canvas() {
 	cont.appendChild(canvas);
 	ctx = canvas.getContext('2d');
 
-	let randpos = () => (Math.random() - 0.5) * w*3;
+	let randpos = () => (Math.random() - 0.5) * w;
 
 	let nodes = graph.nodes.map((n, i) => ({
 		id: i, x: randpos(), y: randpos(), vx: 0, vy: 0
@@ -41,11 +42,19 @@ function setup_canvas() {
 		source: i, target: j
 	}));
 
-	if (false) {
+	if (true) {
 		d3.forceSimulation()
 			.nodes(nodes)
 			.force('center', d3.forceCenter())
-			.force('link', d3.forceLink(links));
+			.force('link', d3.forceLink(links))
+			.force('mb', d3.forceManyBody())
+			.force('collide', d3.forceCollide(radius*4))
+			.stop()
+			.tick(100)
+			.on('tick', function(){
+				console.log('tick');
+			})
+			.restart();
 	}
 
 	function asSupText(f) {
