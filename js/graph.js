@@ -16,14 +16,14 @@ Set.prototype.sdifference = function(other) {
 };
 
 const re_kana = /[\u3040-\u309f]|[\u30a0-\u30ff]/g;
+const re_kanji = /[\u4e00-\u9faf]|[\u3400-\u4dbf]/g;
 
 class Node {
 	constructor([val, desc]) {
 		this.val = val;
 		this.desc = desc;
 		this.chars = new Set(this.val);
-		this.kana = new Set(this.val.match(re_kana));
-		this.kanji = this.chars.difference(this.kana);
+		this.kanji = new Set(this.val.match(re_kanji));
 	}
 }
 
