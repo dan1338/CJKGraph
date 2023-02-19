@@ -28,11 +28,17 @@ class Node {
 }
 
 class NodeGraph {
-	constructor(nodes) {
+	constructor(nodes, link_mode) {
 		this.links = [];
 		this.nodes = nodes;
 
 		const link_thresh = 1;
+
+		let link;
+		if (link_mode == 'mindiff')
+			link = (i,n1,j,n2) => this.linkMinDiff(i,n1,j,n2);
+		else if (link_mode == 'common')
+			link = (i,n1,j,n2) => this.linkCommon(i,n1,j,n2);
 
 		// symmetric difference is, well symmetric thus we can
 		// reduce the number of repeat comparisons
@@ -45,11 +51,21 @@ class NodeGraph {
 				if (this.areLinked(n1, n2))
 					return;
 
-				let d = n1.kanji.sdifference(n2.kanji);
-				if (d.size <= link_thresh)
-					this.pushLink(i, j);
+				link(i, n1, j, n2);
 			});
 		});
+	}
+
+	linkMinDiff(i, n1, j, n2) {
+		let d = n1.kanji.sdifference(n2.kanji);
+		if (d.size <= 1)
+			this.pushLink(i, j);
+	}
+
+	linkCommon(i, n1, j, n2) {
+		let c = n1.kanji.intersect(n2.kanji);
+		if (c.size >= 1)
+			this.pushLink(i, j);
 	}
 
 	pushLink(a, b) {

@@ -9,7 +9,7 @@ let graph;
 window.onload = async function() {
 	raw_data = await get_raw_data();
 	let nodes = raw_data.map(x => new Node(x));
-	graph = new NodeGraph(nodes);
+	graph = new NodeGraph(nodes, 'common')
 
 	setup_canvas();
 }
