@@ -145,11 +145,17 @@ function setup_canvas() {
 		ctx.fillStyle = '#aaa';
 		ctx.strokeStyle = '#ddd';
 
+		let linked = [];
+
 		for (const [i,j] of graph.links) {
 			let n1 = nodes[i], n2 = nodes[j];
-			if (i == hover || j == hover)
+			if (i == hover) {
 				ctx.strokeStyle = '#99f';
-			else
+				linked.push(j);
+			} else if (j == hover) {
+				ctx.strokeStyle = '#99f';
+				linked.push(i);
+			} else
 				ctx.strokeStyle = '#ddd';
 			ctx.beginPath();
 			ctx.moveTo(n1.x, n1.y);
@@ -163,6 +169,8 @@ function setup_canvas() {
 
 			if (node.id == hover)
 				ctx.fillStyle = '#669';
+			else if (linked.find(l => l == node.id))
+				ctx.fillStyle = '#aae';
 			else
 				ctx.fillStyle = '#ddd';
 
