@@ -14,25 +14,17 @@ window.onload = async function() {
 	setup_canvas();
 }
 
-const width = 900, height = 600;
+const width = 1000, height = 800;
 const ox = 0, oy = 0;
 const radius = 16;
 
-let canvas, ctx;
+let canvas;
 
 function setup_canvas() {
-	const cont = document.getElementsByClassName('container')[0];
-	canvas = document.createElement('canvas');
-	canvas.style.width = width;
-	canvas.style.height = height;
-	let w = width * 2, h = height * 2;
-	canvas.width = w;
-	canvas.height = h;
+	canvas = new InteractiveCanvas(width*2, height*2);
+	canvas.attach('.container', width, height);
 
-	cont.appendChild(canvas);
-	ctx = canvas.getContext('2d');
-
-	let randpos = () => (Math.random() - 0.5) * w;
+	let randpos = () => (Math.random() - 0.5) * canvas.w;
 
 	let nodes = graph.nodes.map((n, i) => ({
 		id: i, x: randpos(), y: randpos(), vx: 0, vy: 0
@@ -57,6 +49,8 @@ function setup_canvas() {
 			.restart();
 	}
 
+	let ctx = canvas.ctx;
+
 	function asSupText(f) {
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'bottom';
@@ -73,36 +67,12 @@ function setup_canvas() {
 		f();
 	}
 
-	let ox = 0, oy = 0;
-	let scale = 1;
-	let dragging = false;
 	let hover = null;
 
-	function mouseToCanvas(x,y) {
-		// norm
-		x /= width;
-		y /= height;
-		// center
-		x -= 0.5;
-		y -= 0.5;
-		// rescale
-		x *= w / scale;
-		y *= h / scale;
-		// offset
-		x -= ox;
-		y -= oy;
-		return [x, y];
-	}
-
-	canvas.onmousemove = function(e) {
-		if (dragging) {
-			ox += 2 * e.movementX / scale
-			oy += 2 * e.movementY / scale
-		}
-		// find node closest to cursor
+	canvas.onMove = function(e) {
 		let mini = -1;
 		let minv = 9999999;
-		let [cx,cy] = mouseToCanvas(e.offsetX, e.offsetY);
+		let [cx,cy] = canvas.mouseToPanned(e.offsetX, e.offsetY);
 		for (let i = 0; i < nodes.length; i++) {
 			let n = nodes[i];
 			let dx = n.x-cx, dy = n.y-cy;
@@ -119,74 +89,70 @@ function setup_canvas() {
 				hover = null;
 		}
 	}
-	canvas.onmousewheel = function(e) {
-		if (e.deltaY > 0)
-			scale *= 0.8;
-		else
-			scale *= 1.2;
-	}
-	canvas.onmouseleave = function(e) {
-		dragging = false;
-	}
-	canvas.onmouseup = function(e) {
-		dragging = false;
-	}
-	canvas.onmousedown = function(e) {
-		dragging = true;
+	canvas.onDrag = function(e) {
+		this.ox += e.movementX;
+		this.oy += e.movementY;
 	}
 
-	function draw() {
+	canvas.draw(({w, h}, ctx) => {
+		ctx.scale(2, 2);
 		ctx.clearRect(0, 0, w, h);
+		canvas.panned(() => {
+			// draw links
+			let linked = [];
 
-		ctx.reset();
-		ctx.translate(w / 2, h / 2);
-		ctx.scale(scale, scale);
-		ctx.translate(ox, oy);
-		ctx.fillStyle = '#aaa';
-		ctx.strokeStyle = '#ddd';
+			for (const [i,j] of graph.links) {
+				let n1 = nodes[i], n2 = nodes[j];
+				if (i == hover) {
+					ctx.strokeStyle = '#99f';
+					linked.push(j);
+				} else if (j == hover) {
+					ctx.strokeStyle = '#99f';
+					linked.push(i);
+				} else
+					ctx.strokeStyle = '#ddd';
+				ctx.beginPath();
+				ctx.moveTo(n1.x, n1.y);
+				ctx.lineTo(n2.x, n2.y);
+				ctx.stroke();
+				ctx.closePath();
+			}
+			
+			// draw nodes
+			for (const node of nodes) {
+				let x = node.x, y = node.y;
 
-		let linked = [];
+				if (node.id == hover)
+					ctx.fillStyle = '#669';
+				else if (linked.find(l => l == node.id))
+					ctx.fillStyle = '#aae';
+				else
+					ctx.fillStyle = '#ddd';
 
-		for (const [i,j] of graph.links) {
-			let n1 = nodes[i], n2 = nodes[j];
-			if (i == hover) {
-				ctx.strokeStyle = '#99f';
-				linked.push(j);
-			} else if (j == hover) {
-				ctx.strokeStyle = '#99f';
-				linked.push(i);
-			} else
-				ctx.strokeStyle = '#ddd';
-			ctx.beginPath();
-			ctx.moveTo(n1.x, n1.y);
-			ctx.lineTo(n2.x, n2.y);
-			ctx.stroke();
-			ctx.closePath();
-		}
+				ctx.beginPath();
+				ctx.arc(x, y, radius, 0, 2 * Math.PI);
+				ctx.fill();
+				ctx.closePath();
+			}
 
-		for (const node of nodes) {
-			let x = node.x, y = node.y;
+			// draw suptext
+			asSupText(() => {
+				for (const node of nodes) {
+					let x = node.x, y = node.y;
+					let n = graph.nodes[node.id];
+					ctx.fillText(n.val, x, y-radius);
+				}
+			});
 
-			if (node.id == hover)
-				ctx.fillStyle = '#669';
-			else if (linked.find(l => l == node.id))
-				ctx.fillStyle = '#aae';
-			else
-				ctx.fillStyle = '#ddd';
-
-			ctx.beginPath();
-			ctx.arc(x, y, radius, 0, 2 * Math.PI);
-			ctx.fill();
-			ctx.closePath();
-
-			let n = graph.nodes[node.id];
-			asSupText(() => ctx.fillText(n.val, x, y-radius));
-			asSubText(() => ctx.fillText(n.desc, x, y+radius));
-		}
-
-		requestAnimationFrame(draw);
-	}
-
-	requestAnimationFrame(draw);
+			// draw subtext
+			asSubText(() => {
+				for (const node of nodes) {
+					let x = node.x, y = node.y;
+					let n = graph.nodes[node.id];
+					ctx.fillText(n.desc, x, y+radius);
+				}
+			});
+		});
+	});
 }
 
