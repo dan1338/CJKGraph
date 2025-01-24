@@ -31,6 +31,7 @@ class NodeGraph {
 	constructor(nodes, link_mode) {
 		this.links = [];
 		this.nodes = nodes;
+        this.common_linkcnt = Array.from(nodes).map(x => Array(x.val.length).fill(0));
 
 		const link_thresh = 1;
 
@@ -58,22 +59,32 @@ class NodeGraph {
 
 	linkMinDiff(i, n1, j, n2) {
 		let d = n1.kanji.sdifference(n2.kanji);
+		let c = n1.kanji.intersect(n2.kanji);
 		if (d.size <= 1)
-			this.pushLink(i, j);
+			this.pushLink(i, n1, j, n2, c);
 	}
 
 	linkCommon(i, n1, j, n2) {
 		let c = n1.kanji.intersect(n2.kanji);
 		if (c.size >= 1)
-			this.pushLink(i, j);
+			this.pushLink(i, n1, j, n2, c);
 	}
 
-	pushLink(a, b) {
-		this.links.push([a, b]);
+	pushLink(i, n1, j, n2, common) {
+        for (const ch of common) {
+            const increment_linkcnt = (node_idx, node) => {
+                this.common_linkcnt[node_idx][node.val.indexOf(ch)] += 1
+            }
+
+            increment_linkcnt(i, n1)
+            increment_linkcnt(j, n2)
+        }
+
+		this.links.push([i, j, common]);
 	}
 
 	areLinked(ax, bx) {
-		let l = this.links.find(([i, j]) => {
+		let l = this.links.find(([i, j, _]) => {
 			let a = this.nodes[i], b = this.nodes[j];
 			return (a == ax && b == bx) || (a == bx && b == ax);
 		});
@@ -82,7 +93,7 @@ class NodeGraph {
 	}
 
 	*getLinked(x) {
-		for (const [i, j] of this.links) {
+		for (const [i, j, _] of this.links) {
 			let a = this.nodes[i], b = this.nodes[j];
 			if (x == a)
 				yield b;

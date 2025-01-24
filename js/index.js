@@ -11,25 +11,49 @@ window.onload = async function() {
 	let nodes = raw_data.map(x => new Node(x));
 	graph = new NodeGraph(nodes, 'common')
 
+    body = document.querySelector('body')
+	container = document.getElementsByClassName('container')[0];
+	canvas = document.createElement('canvas');
+
 	setup_canvas();
 }
 
-const width = 900, height = 600;
-const ox = 0, oy = 0;
-const radius = 16;
+// Fake coordinates
+let width = 900, height = 600;
 
+// Real coordinates
+let w, h;
+let ox = 0, oy = 0;
+let radius = 16;
+
+function calc_canvas_target_size() {
+    let w = body.offsetWidth;
+    let h = body.offsetHeight;
+    return [Math.min(1920, w), Math.min(h, 1440)]
+}
+
+window.onresize = async function() {
+    [width, height] = calc_canvas_target_size()
+
+	canvas.style.width = width;
+	canvas.style.height = height;
+	w = canvas.width = width * 2;
+	h = canvas.height = height * 2;
+}
+
+let body;
+let container;
 let canvas, ctx;
 
 function setup_canvas() {
-	const cont = document.getElementsByClassName('container')[0];
-	canvas = document.createElement('canvas');
+    [width, height] = calc_canvas_target_size()
+
 	canvas.style.width = width;
 	canvas.style.height = height;
-	let w = width * 2, h = height * 2;
-	canvas.width = w;
-	canvas.height = h;
+	w = canvas.width = width * 2;
+	h = canvas.height = height * 2;
 
-	cont.appendChild(canvas);
+	container.appendChild(canvas);
 	ctx = canvas.getContext('2d');
 
 	let randpos = () => (Math.random() - 0.5) * w;
@@ -68,15 +92,30 @@ function setup_canvas() {
 	function asSubText(f) {
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'top';
-		ctx.fillStyle = '#bbb';
+		ctx.fillStyle = '#aaa';
 		ctx.font = '14pt Noto Sans JP';
 		f();
 	}
 
-	let ox = 0, oy = 0;
+    function fillTextMultiColor(ctx, text, colors, x, y) {
+        let prevStyle = ctx.fillStyle;
+        for (let i = 0; i < text.length; i++) {
+            let color = colors[i];
+
+            let str = Array.from(text, (ch, j) => i == j? ch : ' ').join('')
+
+            ctx.fillStyle = color ? color : prevStyle;
+            ctx.fillText(str, x, y);
+
+            x += ctx.measureText(text[i]).width;
+        }
+        ctx.fillStyle = prevStyle;
+    }
+
 	let scale = 1;
 	let dragging = false;
 	let hover = null;
+    let sup_colors = null;
 
 	function mouseToCanvas(x,y) {
 		// norm
@@ -93,6 +132,33 @@ function setup_canvas() {
 		y -= oy;
 		return [x, y];
 	}
+
+    function gen_sup_colors(node) {
+        let char_to_color = new Map();
+
+        const color_seq = [
+            "#b8e", // Soft lavender
+            "#ace", // Soft blue
+            "#d8a", // Muted pink
+            "#8be", // Soft cyan
+            "#c8d", // Light purple
+            "#9c8", // Muted green
+            "#dbb", // Pale rose
+            "#eba"  // Light peach
+        ];
+
+        let counter = 0;
+        const n = graph.nodes[node]
+
+        for (const ch of n.val) {
+            if (!char_to_color.has(ch)) {
+                char_to_color.set(ch, color_seq[counter]);
+                counter = (counter + 1) % color_seq.length;
+            }
+        }
+
+        return char_to_color;
+    }
 
 	canvas.onmousemove = function(e) {
 		if (dragging) {
@@ -113,10 +179,12 @@ function setup_canvas() {
 			}
 		}
 		if (mini != -1) {
-			if (minv < 125)
+			if (minv < 125) {
 				hover = mini;
-			else
-				hover = null;
+                sup_colors = gen_sup_colors(hover);
+            } else {
+                sup_colors = hover = null;
+            }
 		}
 	}
 	canvas.onmousewheel = function(e) {
@@ -147,13 +215,13 @@ function setup_canvas() {
 
 		let linked = [];
 
-		for (const [i,j] of graph.links) {
+		for (const [i, j, _] of graph.links) {
 			let n1 = nodes[i], n2 = nodes[j];
 			if (i == hover) {
-				ctx.strokeStyle = '#99f';
+				ctx.strokeStyle = '#bbf';
 				linked.push(j);
 			} else if (j == hover) {
-				ctx.strokeStyle = '#99f';
+				ctx.strokeStyle = '#bbf';
 				linked.push(i);
 			} else
 				ctx.strokeStyle = '#ddd';
@@ -180,8 +248,23 @@ function setup_canvas() {
 			ctx.closePath();
 
 			let n = graph.nodes[node.id];
-			asSupText(() => ctx.fillText(n.val, x, y-radius));
-			asSubText(() => ctx.fillText(n.desc, x, y+radius));
+            if (hover == null) {
+                asSupText(() => ctx.fillText(n.val, x, y-radius));
+            } else {
+                const get_color = (ch) => {
+                    if (sup_colors.has(ch) && graph.common_linkcnt[node.id][n.val.indexOf(ch)] > 0) {
+                        return sup_colors.get(ch);
+                    }
+                    return null;
+                };
+
+                let colors = Array.from(n.val, get_color);
+
+                asSupText(() => fillTextMultiColor(ctx, n.val, colors, x, y-radius));
+            }
+			asSubText(() => {
+                ctx.fillText(n.desc, x, y+radius)
+            });
 		}
 
 		requestAnimationFrame(draw);
